@@ -29,8 +29,8 @@ local TentsBoardWidget = InputContainer:extend{
     board      = nil,
     max_width  = 0,
     max_height = 0,
-    onCellTap  = nil,
-    onCellHold = nil,
+    cellTapCallback  = nil,
+    cellHoldCallback = nil,
 }
 
 function TentsBoardWidget:init()
@@ -86,7 +86,7 @@ function TentsBoardWidget:onCellTap(ges)
     local r = math.floor(ly / self.cell) + 1
     local n = self.board.n
     if r >= 1 and r <= n and c >= 1 and c <= n then
-        if self.onCellTap then self.onCellTap(r, c) end
+        if self.cellTapCallback then self.cellTapCallback(r, c) end
     end
     return true
 end
@@ -100,7 +100,7 @@ function TentsBoardWidget:onCellHold(ges)
     local r = math.floor(ly / self.cell) + 1
     local n = self.board.n
     if r >= 1 and r <= n and c >= 1 and c <= n then
-        if self.onCellHold then self.onCellHold(r, c) end
+        if self.cellHoldCallback then self.cellHoldCallback(r, c) end
     end
     return true
 end
