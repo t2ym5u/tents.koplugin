@@ -77,7 +77,7 @@ function TentsBoardWidget:_cellOrigin(r, c)
     return x, y
 end
 
-function TentsBoardWidget:onCellTap(ges)
+function TentsBoardWidget:onCellTap(_, ges)
     if not self.paint_rect then return end
     local lx = ges.pos.x - self.paint_rect.x - self.clue_w
     local ly = ges.pos.y - self.paint_rect.y - self.clue_w
@@ -91,7 +91,7 @@ function TentsBoardWidget:onCellTap(ges)
     return true
 end
 
-function TentsBoardWidget:onCellHold(ges)
+function TentsBoardWidget:onCellHold(_, ges)
     if not self.paint_rect then return end
     local lx = ges.pos.x - self.paint_rect.x - self.clue_w
     local ly = ges.pos.y - self.paint_rect.y - self.clue_w
@@ -142,13 +142,13 @@ function TentsBoardWidget:paintTo(bb, x, y)
             -- Symbol
             if is_tree then
                 centeredText(bb, "T", self.sym_face,
-                    cx + cell//2, cy + cell//2, C_BG)
+                    cx + math.floor(cell / 2), cy + math.floor(cell / 2), C_BG)
             elseif mark == TentsBoard.MARK_TENT then
                 centeredText(bb, "^", self.sym_face,
-                    cx + cell//2, cy + cell//2, C_FG)
+                    cx + math.floor(cell / 2), cy + math.floor(cell / 2), C_FG)
             elseif mark == TentsBoard.MARK_GRASS then
                 centeredText(bb, ".", self.sym_face,
-                    cx + cell//2, cy + cell//2, C_FG)
+                    cx + math.floor(cell / 2), cy + math.floor(cell / 2), C_FG)
             end
         end
     end
@@ -171,16 +171,16 @@ function TentsBoardWidget:paintTo(bb, x, y)
 
     -- Row clues (right side)
     for r = 1, n do
-        local cy = y + cw + (r - 1) * cell + cell // 2
-        local cx = x + cw + gw + cw // 2
+        local cy = y + cw + (r - 1) * cell + math.floor(cell / 2)
+        local cx = x + cw + gw + math.floor(cw / 2)
         centeredText(bb, tostring(board.row_clues[r] or 0),
             self.num_face, cx, cy, C_CLUE)
     end
 
     -- Column clues (bottom)
     for c = 1, n do
-        local cx = x + cw + (c - 1) * cell + cell // 2
-        local cy = y + cw + gh + cw // 2
+        local cx = x + cw + (c - 1) * cell + math.floor(cell / 2)
+        local cy = y + cw + gh + math.floor(cw / 2)
         centeredText(bb, tostring(board.col_clues[c] or 0),
             self.num_face, cx, cy, C_CLUE)
     end
