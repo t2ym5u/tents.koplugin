@@ -11,6 +11,8 @@ end
 
 local PluginBase  = require("plugin_base")
 local _           = require("gettext")
+
+require("i18n").extend(lrequire("i18n_fr"))
 local TentsScreen = lrequire("screen")
 
 local Tents = PluginBase:extend{
