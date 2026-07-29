@@ -90,6 +90,119 @@ local function generateSolution(n, num_pairs)
 end
 
 -- ---------------------------------------------------------------------------
+-- Uniqueness counter. The puzzle's visible state is tree positions (shown
+-- directly) plus row/col tent-count clues -- there's no "given" mask on
+-- the unknown tent layer at all. The win-check compares literally against
+-- the stored solution, but the REAL constraint set this checks is: each
+-- tree gets exactly one tent, orthogonally adjacent, no two tents adjacent
+-- to each other (incl. diagonally), and the resulting per-row/col tent
+-- counts match the shown clues. MRV backtracking over trees (fewest legal
+-- candidate tent cells first): each tree picks one of its up-to-4
+-- orthogonal empty neighbors as its tent, no two trees may claim the same
+-- cell, no two placed tents may be adjacent, and the final row/col counts
+-- must exactly match the clues.
+-- ---------------------------------------------------------------------------
+
+local function countSolutions(trees, row_clues, col_clues, n, limit, node_budget)
+    local tree_list = {}
+    for r = 1, n do
+        for c = 1, n do
+            if trees[r][c] then tree_list[#tree_list + 1] = { r = r, c = c } end
+        end
+    end
+
+    local tent_at = {}
+    for r = 1, n do tent_at[r] = {}; for c = 1, n do tent_at[r][c] = false end end
+    local claimed_by = {}
+    local row_count, col_count = {}, {}
+    for i = 1, n do row_count[i] = 0; col_count[i] = 0 end
+
+    local placed = {}
+    for i = 1, #tree_list do placed[i] = false end
+
+    local solutions, nodes, exhausted = 0, 0, false
+
+    local function cellKey(r, c) return r * 1000 + c end
+
+    local function tentsTouching(r, c)
+        for dr = -1, 1 do
+            for dc = -1, 1 do
+                if not (dr == 0 and dc == 0) then
+                    local nr, nc = r + dr, c + dc
+                    if inBounds(nr, nc, n) and tent_at[nr][nc] then return true end
+                end
+            end
+        end
+        return false
+    end
+
+    local function candidatesFor(tree)
+        local cands = {}
+        for _, d in ipairs(DIR4) do
+            local nr, nc = tree.r + d[1], tree.c + d[2]
+            if inBounds(nr, nc, n) and not trees[nr][nc]
+                and not claimed_by[cellKey(nr, nc)]
+                and not tentsTouching(nr, nc) then
+                cands[#cands + 1] = { nr, nc }
+            end
+        end
+        return cands
+    end
+
+    local function search()
+        if solutions >= limit or exhausted then return end
+        nodes = nodes + 1
+        if nodes > node_budget then exhausted = true; return end
+
+        local best_i, best_cands, best_len = nil, nil, math.huge
+        for i = 1, #tree_list do
+            if not placed[i] then
+                local cands = candidatesFor(tree_list[i])
+                if #cands < best_len then
+                    best_len, best_cands, best_i = #cands, cands, i
+                    if best_len == 0 then break end
+                end
+            end
+        end
+
+        if not best_i then
+            for r = 1, n do if row_count[r] ~= row_clues[r] then return end end
+            for c = 1, n do if col_count[c] ~= col_clues[c] then return end end
+            solutions = solutions + 1
+            return
+        end
+        if best_len == 0 then return end
+
+        placed[best_i] = true
+        for _, cell in ipairs(best_cands) do
+            local r, c = cell[1], cell[2]
+            tent_at[r][c] = true
+            claimed_by[cellKey(r, c)] = true
+            row_count[r] = row_count[r] + 1
+            col_count[c] = col_count[c] + 1
+
+            search()
+
+            tent_at[r][c] = false
+            claimed_by[cellKey(r, c)] = nil
+            row_count[r] = row_count[r] - 1
+            col_count[c] = col_count[c] - 1
+            if solutions >= limit or exhausted then break end
+        end
+        placed[best_i] = false
+    end
+
+    search()
+    return solutions, exhausted
+end
+
+local function uniquenessNodeBudget(n)
+    if n <= 8 then return 30000 end
+    if n <= 10 then return 60000 end
+    return 100000
+end
+
+-- ---------------------------------------------------------------------------
 -- TentsBoard
 -- ---------------------------------------------------------------------------
 
@@ -114,13 +227,49 @@ function TentsBoard:new(opts)
     return obj
 end
 
+-- The win-check compares literally against the stored solution, so the
+-- clues shown (tree positions + row/col counts) need to pin down that
+-- exact tent placement uniquely -- there's no "given" mask to dig here,
+-- so like hitori/nurikabe/starbattle this generates+verifies whole
+-- candidate solutions instead. Measured pre-fix: real, moderate ambiguity
+-- (roughly 60-87% unique across sizes/difficulties, worse at hard).
 function TentsBoard:generate(diff)
     self.difficulty = diff or self.difficulty
     local n = self.n
     local density = DENSITY[self.difficulty] or 0.65
     local num_pairs = math.max(2, math.floor(n * density))
+    local node_budget = uniquenessNodeBudget(n)
 
-    local trees, tents = generateSolution(n, num_pairs)
+    local best_trees, best_tents, best_row_clues, best_col_clues
+
+    for attempt = 1, 60 do
+        local trees, tents = generateSolution(n, num_pairs)
+        if trees then
+            local row_clues, col_clues = {}, {}
+            for r = 1, n do
+                local cnt = 0
+                for c = 1, n do if tents[r][c] then cnt = cnt + 1 end end
+                row_clues[r] = cnt
+            end
+            for c = 1, n do
+                local cnt = 0
+                for r = 1, n do if tents[r][c] then cnt = cnt + 1 end end
+                col_clues[c] = cnt
+            end
+
+            if not best_trees then
+                best_trees, best_tents, best_row_clues, best_col_clues = trees, tents, row_clues, col_clues
+            end
+
+            local solutions, exhausted = countSolutions(trees, row_clues, col_clues, n, 2, node_budget)
+            if solutions == 1 and not exhausted then
+                best_trees, best_tents, best_row_clues, best_col_clues = trees, tents, row_clues, col_clues
+                break
+            end
+        end
+    end
+
+    local trees, tents = best_trees, best_tents
     if not trees then
         -- Fallback: minimal puzzle
         trees = emptyGrid(n, n, false)
@@ -128,6 +277,17 @@ function TentsBoard:generate(diff)
         if n >= 2 then
             trees[1][2] = true; tents[1][1] = true
             if n >= 4 then trees[3][4] = true; tents[3][3] = true end
+        end
+        best_row_clues, best_col_clues = {}, {}
+        for r = 1, n do
+            local cnt = 0
+            for c = 1, n do if tents[r][c] then cnt = cnt + 1 end end
+            best_row_clues[r] = cnt
+        end
+        for c = 1, n do
+            local cnt = 0
+            for r = 1, n do if tents[r][c] then cnt = cnt + 1 end end
+            best_col_clues[c] = cnt
         end
     end
 
@@ -137,20 +297,8 @@ function TentsBoard:generate(diff)
     self.wrong_cells = emptyGrid(n, n, false)
     self.won       = false
     self.undo:clear()
-
-    -- Compute row/col clues
-    self.row_clues = {}
-    self.col_clues = {}
-    for r = 1, n do
-        local cnt = 0
-        for c = 1, n do if tents[r][c] then cnt = cnt + 1 end end
-        self.row_clues[r] = cnt
-    end
-    for c = 1, n do
-        local cnt = 0
-        for r = 1, n do if tents[r][c] then cnt = cnt + 1 end end
-        self.col_clues[c] = cnt
-    end
+    self.row_clues = best_row_clues
+    self.col_clues = best_col_clues
 end
 
 function TentsBoard:setMark(r, c, mark)
