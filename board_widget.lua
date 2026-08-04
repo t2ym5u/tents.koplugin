@@ -30,6 +30,27 @@ local C_GRASS = Blitbuffer.COLOR_GRAY_D
 local C_WRONG = Blitbuffer.COLOR_GRAY_2
 local C_CLUE  = Blitbuffer.COLOR_BLACK
 
+-- Binary-search the largest font size whose rendered bounding box for `sample`
+-- fits within (max_w, max_h). A fixed size-to-cell ratio isn't safe here:
+-- the font's actual pixel metrics (and any device-side font scaling) can
+-- make glyphs taller than assumed, overflowing the reserved clue band and
+-- bleeding into whatever is painted below the board widget.
+local function bsearchFont(font_name, lo, hi, max_w, max_h, sample)
+    local best = lo
+    while lo <= hi do
+        local mid  = math.floor((lo + hi) / 2)
+        local face = Font:getFace(font_name, mid)
+        local m    = RenderText:sizeUtf8Text(0, max_w, face, sample, true, false)
+        if m.x <= max_w and (m.y_bottom - m.y_top) <= max_h then
+            best = mid
+            lo   = mid + 1
+        else
+            hi   = mid - 1
+        end
+    end
+    return best
+end
+
 -- ---------------------------------------------------------------------------
 -- TentsBoardWidget
 -- ---------------------------------------------------------------------------
@@ -59,10 +80,18 @@ function TentsBoardWidget:init()
     self.h     = cell * (n + 1)
     self.dimen = Geom:new{ w = self.w, h = self.h }
 
-    local num_size = math.max(7, math.floor(cell * 0.5))
-    self.num_face  = Font:getFace("cfont", num_size)
-    local sym_size = math.max(6, math.floor(cell * 0.45))
-    self.sym_face  = Font:getFace("cfont", sym_size)
+    -- Clue digits sit in a cw x cell (or cell x cw) band; measure against the
+    -- widest clue that can ever appear (a full row/column of tents = n) so
+    -- two-digit clues on larger grids are sized correctly too.
+    local pad         = math.max(1, math.floor(cell / 10))
+    local num_sample  = string.rep("8", #tostring(n))
+    local num_hi      = math.max(10, cell)
+    local num_size    = math.max(7, bsearchFont("cfont", 7, num_hi, cell - 2*pad, cell - 2*pad, num_sample))
+    self.num_face     = Font:getFace("cfont", num_size)
+
+    local sym_hi      = math.max(6, cell)
+    local sym_size    = math.max(6, bsearchFont("cfont", 6, sym_hi, cell - 2*pad, cell - 2*pad, "^"))
+    self.sym_face     = Font:getFace("cfont", sym_size)
 
     self.paint_rect = nil
 
@@ -80,16 +109,17 @@ local function centeredText(bb, text, face, cx, cy, color)
 end
 
 function TentsBoardWidget:_cellOrigin(r, c)
-    -- Grid cells start at (clue_w, clue_w) offset
-    local x = self.paint_rect.x + self.clue_w + (c - 1) * self.cell
-    local y = self.paint_rect.y + self.clue_w + (r - 1) * self.cell
+    -- Grid starts at the widget's own origin; the clue band is reserved
+    -- to the right/bottom (see paintTo), not top/left.
+    local x = self.paint_rect.x + (c - 1) * self.cell
+    local y = self.paint_rect.y + (r - 1) * self.cell
     return x, y
 end
 
 function TentsBoardWidget:onCellTap(_, ges)
     if not self.paint_rect then return end
-    local lx = ges.pos.x - self.paint_rect.x - self.clue_w
-    local ly = ges.pos.y - self.paint_rect.y - self.clue_w
+    local lx = ges.pos.x - self.paint_rect.x
+    local ly = ges.pos.y - self.paint_rect.y
     if lx < 0 or ly < 0 then return end
     local c = math.floor(lx / self.cell) + 1
     local r = math.floor(ly / self.cell) + 1
@@ -102,8 +132,8 @@ end
 
 function TentsBoardWidget:onCellHold(_, ges)
     if not self.paint_rect then return end
-    local lx = ges.pos.x - self.paint_rect.x - self.clue_w
-    local ly = ges.pos.y - self.paint_rect.y - self.clue_w
+    local lx = ges.pos.x - self.paint_rect.x
+    local ly = ges.pos.y - self.paint_rect.y
     if lx < 0 or ly < 0 then return end
     local c = math.floor(lx / self.cell) + 1
     local r = math.floor(ly / self.cell) + 1
@@ -163,8 +193,8 @@ function TentsBoardWidget:paintTo(bb, x, y)
     end
 
     -- Grid lines
-    local gx = x + cw
-    local gy = y + cw
+    local gx = x
+    local gy = y
     local gw = cell * n
     local gh = cell * n
     for i = 0, n do
@@ -180,16 +210,16 @@ function TentsBoardWidget:paintTo(bb, x, y)
 
     -- Row clues (right side)
     for r = 1, n do
-        local cy = y + cw + (r - 1) * cell + math.floor(cell / 2)
-        local cx = x + cw + gw + math.floor(cw / 2)
+        local cy = y + (r - 1) * cell + math.floor(cell / 2)
+        local cx = x + gw + math.floor(cw / 2)
         centeredText(bb, tostring(board.row_clues[r] or 0),
             self.num_face, cx, cy, C_CLUE)
     end
 
     -- Column clues (bottom)
     for c = 1, n do
-        local cx = x + cw + (c - 1) * cell + math.floor(cell / 2)
-        local cy = y + cw + gh + math.floor(cw / 2)
+        local cx = x + (c - 1) * cell + math.floor(cell / 2)
+        local cy = y + gh + math.floor(cw / 2)
         centeredText(bb, tostring(board.col_clues[c] or 0),
             self.num_face, cx, cy, C_CLUE)
     end
