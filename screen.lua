@@ -119,6 +119,8 @@ function TentsScreen:buildLayout()
         self.board_widget,
     }
 
+    self.status_text:setMaxWidth(is_landscape and btn_width or board_frame:getSize().w)
+
     local bottom_buttons = ButtonTable:new{
         shrink_unneeded_width = true,
         width   = btn_width,
