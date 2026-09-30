@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-09-30
+
+### Added
+- **Hint** button. Two taps: the first says which cell is about to give, the
+  second acts on it. A cell that contradicts the solution is always reported
+  before a fresh one is revealed.
+
 ## [1.1.12] - 2026-07-29
 
 ### Fixed
