@@ -1,5 +1,6 @@
 local UndoStack  = require("undo_stack")
 local grid_utils = require("grid_utils")
+local Hint       = require("hint")
 
 local shuffle    = grid_utils.shuffle
 local emptyGrid  = grid_utils.emptyGrid
@@ -418,6 +419,20 @@ end
 -- ---------------------------------------------------------------------------
 -- Persistence
 -- ---------------------------------------------------------------------------
+
+-- Marking grass is optional -- _checkWin treats it as an untouched cell -- so
+-- only the tents decide the puzzle: cells the solution leaves empty read as
+-- empty and never get offered, and equals() compares tent-ness. Tree cells
+-- cannot be marked at all.
+Hint.install(TentsBoard, {
+    getUser     = function(b, r, c) return b.marks[r][c] end,
+    getSolution = function(b, r, c) return b.tents_sol[r][c] and MARK_TENT or MARK_NONE end,
+    isEmpty     = function(v) return v == MARK_NONE end,
+    equals      = function(u, s) return (u == MARK_TENT) == (s == MARK_TENT) end,
+    isGiven     = function(b, r, c) return b.trees[r][c] == true end,
+    setCell     = function(b, r, c, v) return b:setMark(r, c, v) end,
+    blank       = MARK_NONE,
+})
 
 function TentsBoard:serialize()
     local n = self.n
