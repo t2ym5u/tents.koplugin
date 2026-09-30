@@ -25,6 +25,7 @@ Tree positions and row/column clues are given; deduce where every tent goes.
 ## Features
 
 - **Multiple grid sizes** — 6×6, 8×8, 10×10, 12×12
+- **Hint** — two taps: the first says which cell is about to give, the second acts on it
 - **Three difficulty levels** — Easy, Medium, Hard
 - **Cell states** — empty, tent, grass (confirmed non-tent)
 - **Clue highlighting** — tap a row/column clue to highlight that line
