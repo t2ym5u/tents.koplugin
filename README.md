@@ -5,7 +5,7 @@ A Tents and Trees plugin for [KOReader](https://github.com/koreader/koreader).
 
 ## Screenshot
 
-*(Screenshot to be added.)*
+![Screenshot](images/tents.png)
 
 ## Rules
 
