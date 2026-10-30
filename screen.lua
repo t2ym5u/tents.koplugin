@@ -7,7 +7,6 @@ local function lrequire(name)
     return package.loaded[key]
 end
 
-local ButtonTable     = require("ui/widget/buttontable")
 local Device          = require("device")
 local FrameContainer  = require("ui/widget/container/framecontainer")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
@@ -42,6 +41,8 @@ Rules:
 • The number of tents in each row and column must match the clue for that line.
 
 Empty cells without trees or tents are grass.
+
+Tap a cell to cycle it: tent, then grass, then empty again. Long-press a cell to mark it as grass directly.
 ]])
 
 local GAME_RULES_FR = [[
@@ -56,6 +57,8 @@ Règles :
 • Le nombre de tentes dans chaque ligne et colonne doit correspondre à l'indice de cette ligne ou colonne.
 
 Les cases vides sans arbre ni tente sont de l'herbe.
+
+Appuyez sur une case pour la faire défiler : tente, puis herbe, puis vide. Un appui long marque directement la case comme herbe.
 ]]
 
 local TentsScreen = ScreenBase:extend{}
@@ -77,34 +80,36 @@ function TentsScreen:serializeState()
 end
 
 function TentsScreen:buildLayout()
-    local sw           = DeviceScreen:getWidth()
-    local sh = DeviceScreen:getHeight()
     local is_landscape = self:isLandscape()
-
-    local btn_width = is_landscape
-        and math.max(math.floor(sw * 0.35), 100)
-        or  math.floor(sw * 0.9)
 
     local title_bar = self:buildTitleBar(_("Tents and Trees"), function()
         return {
             { text = _("New game"),     callback = function() self:onNewGame() end },
             { text = self:_sizeLabel(), callback = function() self:openSizeMenu() end },
-            { text = self:_diffLabel(), callback = function() self:openDiffMenu() end },
+            { text = T(_("Difficulty: %1"), self:_diffLabel()), callback = function() self:openDiffMenu() end },
             self:makeRulesButtonConfig(GAME_RULES_EN, GAME_RULES_FR),
         }
     end)
 
-    local margin      = Size.margin.default
-    local padding     = Size.padding.large
-    local frame_extra = (padding + margin) * 2
-    local board_max
-    if is_landscape then
-        board_max = math.min(sw - math.floor(sw * 0.4) - frame_extra, sh - frame_extra)
-    else
-        board_max = math.min(sw - frame_extra, sh - 160 - frame_extra)
-    end
-    board_max = math.max(board_max, 80)
+    self.status_text:setMaxWidth(self:getControlsWidth())
+    local controls = VerticalGroup:new{
+        align = "center",
+        self.status_text,
+        VerticalSpan:new{ width = Size.span.vertical_large },
+        self:buildActionBar({
+            { text = _("Undo"),   callback = function() self:onUndo() end },
+            { text = _("Check"),  callback = function() self:onCheck() end },
+            { text = _("Hint"),   callback = function() self:onHint() end },
+            { text = _("Reveal"), callback = function() self:onReveal() end },
+        }),
+    }
 
+    -- The widget draws its own thick border around the grid (the clues sit
+    -- outside it), so the frame stays borderless: one visible edge, not two.
+    local frame_pad   = Size.padding.large
+    local frame_extra = 2 * frame_pad
+    local budget_w, budget_h = self:getBoardBudget(title_bar, controls)
+    local board_max = math.max(math.min(budget_w, budget_h) - frame_extra, 80)
     self.board_widget = TentsBoardWidget:new{
         board      = self.board,
         max_width  = board_max,
@@ -112,48 +117,24 @@ function TentsScreen:buildLayout()
         cellTapCallback  = function(r, c) self:onCellTap(r, c) end,
         cellHoldCallback = function(r, c) self:onCellHold(r, c) end,
     }
-
     local board_frame = FrameContainer:new{
-        padding = padding,
-        margin  = margin,
+        padding    = frame_pad,
+        margin     = 0,
+        bordersize = 0,
         self.board_widget,
     }
 
-    self.status_text:setMaxWidth(is_landscape and btn_width or board_frame:getSize().w)
-
-    local bottom_buttons = ButtonTable:new{
-        shrink_unneeded_width = true,
-        width   = btn_width,
-        buttons = {{
-            { text = _("Undo"),   callback = function() self:onUndo() end },
-            { text = _("Check"),  callback = function() self:onCheck() end },
-            { text = _("Hint"), callback = function() self:onHint() end },
-            { text = _("Reveal"), callback = function() self:onReveal() end },
-        }},
-    }
-
     if is_landscape then
-        local panel = VerticalGroup:new{
-            align = "center",
-            self.status_text,
-            VerticalSpan:new{ width = Size.span.vertical_large },
-            bottom_buttons,
-        }
         local content = HorizontalGroup:new{
-            align  = "center",
+            align = "center",
             board_frame,
-            HorizontalSpan:new{ width = Size.span.horizontal_default },
-            panel,
+            HorizontalSpan:new{ width = self:getGutter() },
+            controls,
         }
         self:buildLandscapeLayout(title_bar, content)
     else
-        local content = VerticalGroup:new{
-            align = "center",
-            board_frame,
-            VerticalSpan:new{ width = Size.span.vertical_large },
-            self.status_text,
-        }
-        self:buildPortraitLayout(title_bar, content, bottom_buttons)
+        self:buildPortraitLayout(title_bar, board_frame,
+            VerticalGroup:new{ align = "center", controls, VerticalSpan:new{ width = self:getGutter() } })
     end
     self:updateStatus()
 end
@@ -207,7 +188,7 @@ function TentsScreen:openSizeMenu()
         items[#items + 1] = { id = n, text = string.format("%d\xC3\x97%d", n, n) }
     end
     MenuHelper.openPickerMenu{
-        title      = _("Grid size"),
+        title      = _("Select size"),
         items      = items,
         current_id = self.plugin:getSetting("grid_n", TentsBoard.DEFAULT_N),
         parent     = self,
@@ -228,7 +209,7 @@ function TentsScreen:openDiffMenu()
         on_select = function(diff)
             self.plugin:saveSetting("difficulty", diff)
             if self.diff_btn then
-                self.diff_btn:setText(self:_diffLabel(), self.diff_btn.width)
+                self.diff_btn:setText(T(_("Difficulty: %1"), self:_diffLabel()), self.diff_btn.width)
             end
             self:onNewGame()
         end,
@@ -253,14 +234,24 @@ function TentsScreen:updateStatus(msg)
         end
         local total = 0
         for _, v in ipairs(self.board.row_clues) do total = total + v end
-        status = T(_("Tents: %1/%2  Tap=cycle  Long=grass"), tents, total)
+        status = self:joinStatus(
+            T("%1×%1", n),
+            self:_diffLabel(),
+            T(_("Tents: %1/%2"), tents, total))
     end
     ScreenBase.updateStatus(self, status)
+    -- Every move, hint, undo and reveal ends here, so the bar follows the board.
+    self:refreshActionBar()
+end
+
+-- Reveal marks the board won, so it ends the round too.
+function TentsScreen:isRoundOver()
+    return self.board.won
 end
 
 function TentsScreen:_sizeLabel()
     local n = self.plugin:getSetting("grid_n", TentsBoard.DEFAULT_N)
-    return string.format("%d\xC3\x97%d", n, n)
+    return T(_("Size: %1"), string.format("%d\xC3\x97%d", n, n))
 end
 
 function TentsScreen:_diffLabel()
