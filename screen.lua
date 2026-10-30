@@ -85,6 +85,7 @@ function TentsScreen:buildLayout()
     local title_bar = self:buildTitleBar(_("Tents and Trees"), function()
         return {
             { text = _("New game"),     callback = function() self:onNewGame() end },
+            self:makeDailyButtonConfig(),
             { text = self:_sizeLabel(), callback = function() self:openSizeMenu() end },
             { text = T(_("Difficulty: %1"), self:_diffLabel()), callback = function() self:openDiffMenu() end },
             self:makeRulesButtonConfig(GAME_RULES_EN, GAME_RULES_FR),
