@@ -24,8 +24,7 @@ local TentsBoard = lrequire("board")
 local C_BG    = Blitbuffer.COLOR_WHITE
 local C_FG    = Blitbuffer.COLOR_BLACK
 local C_GRID  = Blitbuffer.COLOR_GRAY_9
-local C_TREE  = Blitbuffer.COLOR_GRAY_3
-local C_TENT  = Blitbuffer.COLOR_GRAY_7
+local C_TREE  = Blitbuffer.COLOR_GRAY_7
 local C_GRASS = Blitbuffer.COLOR_GRAY_D
 local C_WRONG = Blitbuffer.COLOR_GRAY_2
 local C_CLUE  = Blitbuffer.COLOR_BLACK
@@ -35,13 +34,16 @@ local C_CLUE  = Blitbuffer.COLOR_BLACK
 -- the font's actual pixel metrics (and any device-side font scaling) can
 -- make glyphs taller than assumed, overflowing the reserved clue band and
 -- bleeding into whatever is painted below the board widget.
+-- Measure with an unbounded width: sizeUtf8Text truncates at its width
+-- argument, so passing max_w would make m.x <= max_w always true. Ink
+-- height is y_top (above baseline) + y_bottom (below baseline).
 local function bsearchFont(font_name, lo, hi, max_w, max_h, sample)
     local best = lo
     while lo <= hi do
         local mid  = math.floor((lo + hi) / 2)
         local face = Font:getFace(font_name, mid)
-        local m    = RenderText:sizeUtf8Text(0, max_w, face, sample, true, false)
-        if m.x <= max_w and (m.y_bottom - m.y_top) <= max_h then
+        local m    = RenderText:sizeUtf8Text(0, math.huge, face, sample, true, false)
+        if m.x <= max_w and (m.y_top + m.y_bottom) <= max_h then
             best = mid
             lo   = mid + 1
         else
@@ -86,12 +88,8 @@ function TentsBoardWidget:init()
     local pad         = math.max(1, math.floor(cell / 10))
     local num_sample  = string.rep("8", #tostring(n))
     local num_hi      = math.max(10, cell)
-    local num_size    = math.max(7, bsearchFont("cfont", 7, num_hi, cell - 2*pad, cell - 2*pad, num_sample))
+    local num_size    = math.max(7, bsearchFont("cfont", 7, num_hi, cell - 4*pad, math.floor(cell * 0.55), num_sample))
     self.num_face     = Font:getFace("cfont", num_size)
-
-    local sym_hi      = math.max(6, cell)
-    local sym_size    = math.max(6, bsearchFont("cfont", 6, sym_hi, cell - 2*pad, cell - 2*pad, "^"))
-    self.sym_face     = Font:getFace("cfont", sym_size)
 
     self.paint_rect = nil
 
@@ -102,10 +100,43 @@ function TentsBoardWidget:init()
 end
 
 local function centeredText(bb, text, face, cx, cy, color)
-    local m = RenderText:sizeUtf8Text(0, cx * 2, face, text, true, false)
+    local m = RenderText:sizeUtf8Text(0, math.huge, face, text, true, false)
     local tx = cx - math.floor(m.x / 2)
-    local ty = cy - math.floor((m.y_bottom - m.y_top) / 2)
+    local ty = cy + math.floor((m.y_top - m.y_bottom) / 2)
     RenderText:renderUtf8Text(bb, tx, ty, face, text, true, false, color or Blitbuffer.COLOR_BLACK)
+end
+
+-- Tree: round dark crown on a black trunk, drawn on a white cell.
+local function drawTree(bb, x, y, s)
+    local cx     = x + math.floor(s / 2)
+    local trunk_w = math.max(2, math.floor(s * 0.14))
+    local trunk_top = y + math.floor(s * 0.55)
+    local trunk_bot = y + math.floor(s * 0.88)
+    bb:paintRect(cx - math.floor(trunk_w / 2), trunk_top, trunk_w, trunk_bot - trunk_top, C_FG)
+    local r  = math.floor(s * 0.32)
+    local cy = y + math.floor(s * 0.40)
+    bb:paintCircle(cx, cy, r, C_FG)
+    bb:paintCircle(cx, cy, math.max(1, r - math.max(1, math.floor(s / 25))), C_TREE)
+end
+
+-- Tent: black triangle with a white door slit, on a white cell.
+local function drawTent(bb, x, y, s, color)
+    local cx  = x + math.floor(s / 2)
+    local top = y + math.floor(s * 0.18)
+    local bot = y + math.floor(s * 0.82)
+    local half = math.floor(s * 0.36)
+    local h   = bot - top
+    for i = 0, h - 1 do
+        local hw = math.floor(half * (i + 1) / h)
+        bb:paintRect(cx - hw, top + i, 2 * hw + 1, 1, color)
+    end
+    -- door: a narrow inverted wedge in the lower half
+    local dh = math.floor(h * 0.45)
+    local dhalf = math.floor(half * 0.30)
+    for i = 0, dh - 1 do
+        local hw = math.floor(dhalf * (i + 1) / dh)
+        bb:paintRect(cx - hw, bot - dh + i, 2 * hw + 1, 1, C_BG)
+    end
 end
 
 function TentsBoardWidget:_cellOrigin(r, c)
@@ -168,10 +199,10 @@ function TentsBoardWidget:paintTo(bb, x, y)
             local is_tree  = board.trees[r][c]
             local is_wrong = board.wrong_cells and board.wrong_cells[r][c]
 
+            -- Trees and tents are drawn as shapes on white; only grass and
+            -- wrong cells get a background tint.
             local bg = C_BG
-            if is_tree       then bg = C_TREE
-            elseif is_wrong  then bg = C_WRONG
-            elseif mark == TentsBoard.MARK_TENT  then bg = C_TENT
+            if is_wrong and not is_tree then bg = C_WRONG
             elseif mark == TentsBoard.MARK_GRASS then bg = C_GRASS
             end
 
@@ -180,14 +211,12 @@ function TentsBoardWidget:paintTo(bb, x, y)
 
             -- Symbol
             if is_tree then
-                centeredText(bb, "T", self.sym_face,
-                    cx + math.floor(cell / 2), cy + math.floor(cell / 2), C_BG)
+                drawTree(bb, cx, cy, cell)
             elseif mark == TentsBoard.MARK_TENT then
-                centeredText(bb, "^", self.sym_face,
-                    cx + math.floor(cell / 2), cy + math.floor(cell / 2), C_FG)
+                drawTent(bb, cx, cy, cell, is_wrong and C_BG or C_FG)
             elseif mark == TentsBoard.MARK_GRASS then
-                centeredText(bb, ".", self.sym_face,
-                    cx + math.floor(cell / 2), cy + math.floor(cell / 2), C_FG)
+                local dr = math.max(1, math.floor(cell / 14))
+                bb:paintCircle(cx + math.floor(cell / 2), cy + math.floor(cell / 2), dr, C_FG)
             end
         end
     end

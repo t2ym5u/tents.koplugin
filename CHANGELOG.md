@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-10-30
+
+### Changed
+- Redesigned play screen: the board is larger, filling the room the controls
+  leave, with a full-width action bar under the status line. The grid's thick
+  border is now the board's only frame.
+- Trees and tents are drawn as shapes on white cells (a crowned tree, a tent
+  with a door) instead of "T" and "^" letters on grey, and grass as a small
+  disc instead of a ".".
+- The status line shows size, difficulty and "Tents: 3/10", and wraps in
+  landscape instead of being cut off. The "Tap=cycle Long=grass" help it used
+  to carry is now in the rules.
+- The title-bar menu shows "Size: …" and "Difficulty: …" (was the bare
+  values), like every other game.
+- Once the puzzle is solved (or revealed), the action bar shows "New game" in
+  place of Undo/Check/Hint/Reveal, so the next round no longer needs the
+  menu.
+
+### Fixed
+- Clue numbers overflowed their space: the font fit accepted every size. They
+  are now fitted to the cell.
+- Using a hint wiped the saved game; it is now kept. When a hint places the
+  last tent, the status shows the win message.
+
 ## [1.2.2] - 2026-10-07
 
 ### Fixed
