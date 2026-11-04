@@ -140,4 +140,51 @@ describe("TentsBoard", function()
             assert.is_false(b:load({}))
         end)
     end)
+
+    describe("empty / countSolutions", function()
+        it("new{ empty = true } builds no puzzle, and load fills it", function()
+            local saved = Board:new{ n = 8, difficulty = "hard" }:serialize()
+            local b = Board:new{ n = 8, difficulty = "hard", empty = true }
+            assert.is_nil(b.trees)
+            assert.is_true(b:load(saved))
+            assert.are.same(saved, b:serialize())
+        end)
+
+        it("finds exactly one solution for every generated puzzle", function()
+            for _, n in ipairs(Board.SIZES) do
+                for _, d in ipairs({ "easy", "medium", "hard" }) do
+                    for seed = 1, 15 do
+                        math.randomseed(seed)
+                        local b = Board:new{ n = n, difficulty = d }
+                        local count, exhausted = Board._countSolutions(
+                            b.trees, b.row_clues, b.col_clues, n, 2, 1e7)
+                        assert.is_false(exhausted)
+                        assert.are.equal(1, count)
+                    end
+                end
+            end
+        end)
+
+        it("counts every placement when the clues allow several", function()
+            -- Two trees side by side on a 4x4 board, at (2,2) and (2,3).
+            local trees = {}
+            for r = 1, 4 do trees[r] = { false, false, false, false } end
+            trees[2][2], trees[2][3] = true, true
+            -- Tents (1,2) and (3,3): row clues 1,0,1,0, col clues 0,1,1,0.
+            -- (3,2)+(1,3) satisfies the same clues: two solutions.
+            local count, exhausted = Board._countSolutions(
+                trees, { 1, 0, 1, 0 }, { 0, 1, 1, 0 }, 4, 10, 1e7)
+            assert.is_false(exhausted)
+            assert.are.equal(2, count)
+        end)
+
+        it("generates 12x12 Hard puzzles quickly (was up to ~0.1 s each on a desktop)", function()
+            local t = os.clock()
+            for seed = 1, 30 do
+                math.randomseed(seed)
+                Board:new{ n = 12, difficulty = "hard" }
+            end
+            assert.is_true(os.clock() - t < 3, "30 puzzles took " .. (os.clock() - t) .. " s")
+        end)
+    end)
 end)

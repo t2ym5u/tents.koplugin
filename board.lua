@@ -141,8 +141,14 @@ local function countSolutions(trees, row_clues, col_clues, n, limit, node_budget
         local cands = {}
         for _, d in ipairs(DIR4) do
             local nr, nc = tree.r + d[1], tree.c + d[2]
+            -- A row or column already holding its clue's worth of tents
+            -- takes no more: dropping those cells here (rather than only
+            -- checking the counts once every tree is placed) lets MRV see
+            -- the real choices and prunes dead branches early.
             if inBounds(nr, nc, n) and not trees[nr][nc]
                 and not claimed_by[cellKey(nr, nc)]
+                and row_count[nr] < row_clues[nr]
+                and col_count[nc] < col_clues[nc]
                 and not tentsTouching(nr, nc) then
                 cands[#cands + 1] = { nr, nc }
             end
@@ -224,7 +230,9 @@ function TentsBoard:new(opts)
         won        = false,
         undo       = UndoStack:new{ max_size = 500 },
     }, self)
-    obj:generate()
+    -- opts.empty: the caller loads a save or generates itself, so don't
+    -- build a puzzle that would be thrown away.
+    if not opts.empty then obj:generate() end
     return obj
 end
 
@@ -489,5 +497,6 @@ TentsBoard.MARK_TENT  = MARK_TENT
 TentsBoard.MARK_GRASS = MARK_GRASS
 TentsBoard.SIZES      = SIZES
 TentsBoard.DEFAULT_N  = DEFAULT_N
+TentsBoard._countSolutions = countSolutions   -- for the specs
 
 return TentsBoard
