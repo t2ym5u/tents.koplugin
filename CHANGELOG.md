@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-11-04
+
+### Changed
+- Much faster puzzle generation: the uniqueness check now leaves out a
+  square as soon as its row or column already holds as many tents as its
+  clue says, instead of checking the counts only once every tree had a
+  tent. 12×12 Hard went from up to 120 ms on a desktop (about 3 s on a Kobo)
+  to about 1 ms. Puzzles are the same for almost every seed (still exactly
+  one solution); the rare candidate the old check gave up on is now
+  checked to the end.
+- Opening the game no longer builds a puzzle it then throws away (it was
+  generated even when a saved game was about to be restored).
+
 ## [1.4.3] - 2026-11-03
 
 ### Changed

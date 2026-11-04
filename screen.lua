@@ -67,9 +67,9 @@ function TentsScreen:init()
     local state = self.plugin:loadState()
     local n     = self.plugin:getSetting("grid_n",     TentsBoard.DEFAULT_N)
     local diff  = self.plugin:getSetting("difficulty", "medium")
-    self.board  = TentsBoard:new{ n = n, difficulty = diff }
+    self.board  = TentsBoard:new{ n = n, difficulty = diff, empty = true }
     if not self.board:load(state) then
-        -- fresh puzzle
+        self.board:generate()
     end
     self.mode = "tent"   -- or "grass"
     ScreenBase.init(self)
