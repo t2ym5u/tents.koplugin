@@ -20,6 +20,7 @@ local T               = require("ffi/util").template
 
 local ScreenBase        = require("screen_base")
 local MenuHelper        = require("menu_helper")
+local GenProgress       = require("gen_progress")
 local TentsBoard        = lrequire("board")
 local TentsBoardWidget  = lrequire("board_widget")
 
@@ -69,7 +70,7 @@ function TentsScreen:init()
     local diff  = self.plugin:getSetting("difficulty", "medium")
     self.board  = TentsBoard:new{ n = n, difficulty = diff, empty = true }
     if not self.board:load(state) then
-        self.board:generate()
+        GenProgress.run(function(on_progress) self.board:generate(diff, on_progress) end)
     end
     self.mode = "tent"   -- or "grass"
     ScreenBase.init(self)
@@ -177,7 +178,8 @@ end
 function TentsScreen:onNewGame()
     local n    = self.plugin:getSetting("grid_n",     TentsBoard.DEFAULT_N)
     local diff = self.plugin:getSetting("difficulty", "medium")
-    self.board = TentsBoard:new{ n = n, difficulty = diff }
+    self.board = TentsBoard:new{ n = n, difficulty = diff, empty = true }
+    GenProgress.run(function(on_progress) self.board:generate(diff, on_progress) end)
     self.plugin:saveState(self.board:serialize())
     self:buildLayout()
     UIManager:setDirty(self, function() return "ui", self.dimen end)
