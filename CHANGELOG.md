@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-11-05
+
+### Changed
+- Real puzzles at every size: about one tree for every 5 to 7 squares
+  (6×6: 5 to 8 trees, 12×12: 22 to 30). Before, a whole grid held only
+  3 to 9 trees, most rows were empty and every puzzle solved itself.
+- Difficulty levels now really differ. Every puzzle is checked by a solver
+  that reasons like a player, never by trial and error: Easy needs only the
+  basic steps (full rows, a tree with one free square, squares around a
+  tent), Medium needs 1 to 4 harder steps (a square touching every possible
+  tent of a tree, working out how a row's tents can fit), Hard needs more of
+  them and has more trees. Easy and Medium were the same puzzles at 6×6.
+- A finished grid wins whenever it keeps the rules, even if the trees pair
+  up with the tents differently from the generated solution.
+- A "Generating puzzle…" bar shows if a puzzle takes a moment to build.
+- Today's Daily Challenge puzzle changes once with this update.
+
+### Fixed
+- Removed the fallback that, after 60 failed tries, could hand out a puzzle
+  that had not been checked for a single solution.
+
 ## [1.5.2] - 2026-11-04
 
 ### Fixed

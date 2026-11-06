@@ -26,10 +26,10 @@ Tree positions and row/column clues are given; deduce where every tent goes.
 
 - **Multiple grid sizes** — 6×6, 8×8, 10×10, 12×12
 - **Hint** — two taps: the first says which cell is about to give, the second acts on it
-- **Three difficulty levels** — Easy, Medium, Hard
+- **Three difficulty levels** — Easy, Medium, Hard: more trees and harder
+  deductions at each level; every puzzle has exactly one solution and never
+  needs trial and error
 - **Cell states** — empty, tent, grass (confirmed non-tent)
-- **Clue highlighting** — tap a row/column clue to highlight that line
-- **Pairing display** — shows the tree–tent pairing once the puzzle is solved
 - **Check** — highlights contradictions with row/column clues and adjacency rules
 - **Reveal solution** — shows the full solution
 - **Undo** — step back through your moves
@@ -39,15 +39,13 @@ Tree positions and row/column clues are given; deduce where every tent goes.
 
 | Action | How |
 |--------|-----|
-| Place / remove a tent | Tap a cell (in tent mode) |
-| Mark a cell as grass | Long-press or tap in grass mode |
-| Toggle tent / grass mode | Tap the **Mode** button |
+| Cycle a cell: tent, grass, empty | Tap the cell |
+| Mark a cell as grass | Long-press the cell |
 | Undo last move | Tap **Undo** |
 | Check progress | Tap **Check** |
-| New game | Tap **New game** |
-| Change grid size | Tap **Size** |
-| Change difficulty | Tap **Difficulty** |
-| Show rules | Tap **Rules** |
+| Get a hint | Tap **Hint** |
+| Show the solution | Tap **Reveal** |
+| New game, Daily Challenge, size, difficulty, rules | Menu (top left) |
 
 ## Why e-ink friendly?
 
